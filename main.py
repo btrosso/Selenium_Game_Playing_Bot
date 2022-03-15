@@ -1,59 +1,65 @@
 import time
 from selenium import webdriver
-from selenium.webdriver.common.keys import Keys
 
 COOKIE_URL = "http://orteil.dashnet.org/experiments/cookie/"
-
 chrome_driver_path = "C:\Development\chromedriver.exe"
 driver = webdriver.Chrome(executable_path=chrome_driver_path)
-
 driver.get(COOKIE_URL)
-
 cookie = driver.find_element_by_css_selector("#cookie")
 
+# grab the items from the store menu
+items = driver.find_elements_by_css_selector("#store div")
+# grab their ids
+item_ids = [item.get_attribute("id") for item in items]
 
+timeout = time.time() + 5
+five_min = time.time() + 60*5  # 5minutes
 
+while True:
+    cookie.click()
 
+    # Every 5 seconds:
+    if time.time() > timeout:
+        # get price elements to work with
+        all_prices = driver.find_elements_by_css_selector("#store b")
+        prices = []
 
+        # turn the prices into valid integers and add to prices list
+        for price in all_prices:
+            price_text = price.text
+            if price_text != "":
+                cost = int(price_text.split("-")[1].strip().replace(",", ""))
+                prices.append(cost)
 
-# # get all the upgrade elements
-# upgrades = driver.find_elements_by_css_selector("#rightPanel #store div")
-# # delete the last one in the list (its empty)
-# del upgrades[-1]
-# # convert to text for readability
-# upgrades_text = [upgrade.text for upgrade in upgrades]
-# # create list of prices
-# upgrade_prices = [int(upgrade.split("- ")[1].split("\n")[0].replace(",", "")) for upgrade in upgrades_text]
-# # create a dictionary to work with all the pieces
-# upgrades_dict = {}
-# for num in range(len(upgrades)):
-#     upgrades_dict[num] = {
-#         "name": upgrades_text[num],
-#         "price": upgrade_prices[num],
-#         "element": upgrades[num]
-#     }
-# print(upgrades_dict)
-#
-# def check_for_upgrades(upgrades: dict) -> int:
-#     current_cookies = int(driver.find_element_by_css_selector("#money").text)
-#     index = len(upgrades)-1
-#     for _ in range(len(upgrades)):
-#         if upgrades[index]["price"] < current_cookies:
-#             return index
-#         else:
-#             index -= 1
-#
-# # 5 minutes from now
-# # timeout = time.time() + 60*5
-# # test timeout - the number at the end is in seconds
-# timeout = time.time() + 30
-#
-# while time.time() < timeout:
-#     cookie.click()
-#     if int(time.time()) % 5 == 0:
-#         try:
-#             element = upgrades[check_for_upgrades(upgrades_dict)]
-#             element.click()
-#         except TypeError:
-#             pass
+        # create a dictionary with the prices and ids
+        cookie_upgrades = {}
+        for n in range(len(prices)):
+            cookie_upgrades[prices[n]] = item_ids[n]
 
+        # grab the money element to work with and turn into a valid int
+        money_element = driver.find_element_by_id("money").text
+        if "," in money_element:
+            money_element = money_element.replace(",", "")
+        cookie_count = int(money_element)
+
+        # find the upgrades currently affordable
+        affordable_upgrades = {}
+        for cost, id in cookie_upgrades.items():
+            if cookie_count > cost:
+                affordable_upgrades[cost] = id
+
+        # find the most expensive upgrade we can currently afford
+        most_expensive_upgrade = max(affordable_upgrades)
+        print(most_expensive_upgrade)
+        buy_this_upgrade_id = affordable_upgrades[most_expensive_upgrade]
+
+        driver.find_element_by_id(buy_this_upgrade_id).click()
+
+        # add another 5 seconds until the next click
+        timeout = time.time() + 5
+
+        #After 5 minutes stop the bot and check the cookies per second count.
+        if time.time() > five_min:
+            cookie_per_s = driver.find_element_by_id("cps").text
+            print(cookie_per_s)
+            break
